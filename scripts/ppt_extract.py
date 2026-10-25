@@ -128,11 +128,21 @@ def run_prepare(args):
 
 
 def build_pdf(image_files, pdf_path):
-    """按传入顺序将图片拼接为多页 PDF(需 Pillow)。"""
+    """按传入顺序将图片拼接为多页 PDF(需 Pillow)。
+
+    规则:只允许"最终保留页"进入 PDF。
+    禁止传入 candidates/sheets/探针帧等辅助判断图片。
+    """
     try:
         from PIL import Image
     except ImportError:
         sys.exit("需要 Pillow: <venv-python> -m pip install Pillow")
+    bad = [f for f in image_files
+           if "/candidates/" in f.replace("\\", "/") or "/sheets/" in f.replace("\\", "/")
+           or os.path.basename(f).startswith(("cand_", "sheet_", "probe_", "f_"))]
+    if bad:
+        sys.exit(f"拒绝生成:检测到辅助/中间图片混入 PDF 源,例如 {os.path.basename(bad[0])}。\n"
+                 "PDF 只应包含最终保留页(slide_*.jpg 或 export 导出清单)。")
     pages = []
     for f in image_files:
         img = Image.open(f)
