@@ -24,7 +24,7 @@ agent_created: true
      ln -sf <该目录>/ffmpeg /opt/homebrew/bin/ffmpeg
      ln -sf <该目录>/ffprobe /opt/homebrew/bin/ffprobe
      ```
-2. **Python 依赖**：opencv-python-headless、numpy（建议装入隔离 venv，勿全局安装）。
+2. **Python 依赖**：opencv-python-headless、numpy、Pillow（建议装入隔离 venv，勿全局安装）。
 
 ## 工作流程
 
@@ -60,12 +60,19 @@ agent_created: true
 
 ```bash
 <venv-python> <skill-dir>/scripts/ppt_extract.py export VIDEO --workdir WORKDIR \
-    --keep "1-44" --drop "2,17" --outdir OUTDIR [--zip]
+    --keep "1-44" --drop "2,17" --outdir OUTDIR [--zip] [--pdf OUT.pdf]
 ```
 
-- 导出的是**全分辨率原始帧**（保留视频原始布局，不套裁剪），命名 `slide_NNN_HHhMMmSSs.jpg`。
+- 导出的是**全分辨率原始帧**（保留视频原始布局，不套裁剪），命名 `slide_NNN_HHhMMmSSs.jpg`，文件名按时间递增、天然有序。
 - `--keep` 支持区间与枚举（`"1-44"`、`"1,3,5-9"`），`--drop` 在其基础上剔除。
 - `--interval` 必须与 prepare 时一致（默认 5）。
+- `--pdf` 将导出的截图**按时间顺序**拼接为多页 PDF；也可用独立子命令拼任意截图目录：
+  ```bash
+  <venv-python> <skill-dir>/scripts/ppt_extract.py pdf 截图目录 --out 成品.pdf [--pattern "slide_*.jpg"]
+  ```
+- `--zip` 打包导出目录（纯 Python 实现，Windows/macOS 均可用）。
+
+用户要求"整理成 PDF/讲义"时，默认在导出后加 `--pdf`，并把 PDF 作为主要交付物之一。
 
 ### 第 4 步：交付
 

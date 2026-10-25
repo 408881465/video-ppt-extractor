@@ -127,6 +127,35 @@ def run_prepare(args):
     print("下一步: 逐张查看图墙,记录『保留/剔除/疑似动画中间态』的候选编号,再运行 export 子命令。")
 
 
+def build_pdf(image_files, pdf_path):
+    """按传入顺序将图片拼接为多页 PDF(需 Pillow)。"""
+    try:
+        from PIL import Image
+    except ImportError:
+        sys.exit("需要 Pillow: <venv-python> -m pip install Pillow")
+    pages = []
+    for f in image_files:
+        img = Image.open(f)
+        if img.mode in ("RGBA", "P", "LA"):
+            img = img.convert("RGB")
+        pages.append(img)
+    if not pages:
+        sys.exit("没有可写入 PDF 的图片")
+    pages[0].save(pdf_path, save_all=True, append_images=pages[1:], resolution=96.0)
+    print(f"已生成 PDF({len(pages)} 页) -> {pdf_path}")
+
+
+def zip_dir(src_dir, zp):
+    import zipfile
+    base = os.path.basename(src_dir.rstrip("/\\"))
+    with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, _, files in os.walk(src_dir):
+            for f in sorted(files):
+                full = os.path.join(root, f)
+                z.write(full, os.path.join(base, os.path.relpath(full, src_dir)))
+    print(f"已打包 -> {zp}")
+
+
 def run_export(args):
     workdir = os.path.abspath(args.workdir)
     cdir = os.path.join(workdir, "frames")
@@ -147,6 +176,7 @@ def run_export(args):
 
     outdir = os.path.abspath(args.outdir)
     os.makedirs(outdir, exist_ok=True)
+    exported = []
     n = 0
     for f in cands:
         num = int(os.path.basename(f).split("_")[1])
@@ -158,15 +188,25 @@ def run_export(args):
         if not os.path.exists(src):
             print(f"  跳过 cand_{num:03d}: 找不到 {src}")
             continue
-        # 导出全分辨率原始帧(含原始布局),不套裁剪
-        shutil.copy(src, os.path.join(outdir, f"slide_{n + 1:03d}_{hms(t)}.jpg"))
+        # 导出全分辨率原始帧(含原始布局),不套裁剪;文件名按时间递增,天然有序
+        dst = os.path.join(outdir, f"slide_{n + 1:03d}_{hms(t)}.jpg")
+        shutil.copy(src, dst)
+        exported.append(dst)
         n += 1
     print(f"已导出 {n} 张 -> {outdir}")
+    if args.pdf:
+        build_pdf(exported, os.path.abspath(args.pdf))
     if args.zip:
-        base = os.path.basename(outdir.rstrip("/"))
-        zp = os.path.join(os.path.dirname(outdir), base + ".zip")
-        subprocess.run(["zip", "-qr", zp, base], cwd=os.path.dirname(outdir), check=True)
-        print(f"已打包 -> {zp}")
+        base = os.path.basename(outdir.rstrip("/\\"))
+        zip_dir(outdir, os.path.join(os.path.dirname(outdir), base + ".zip"))
+
+
+def run_pdf(args):
+    # 独立子命令:把任意目录下的截图(按文件名排序=时间序)拼成 PDF
+    files = sorted(glob.glob(os.path.join(os.path.abspath(args.imgdir), args.pattern)))
+    if not files:
+        sys.exit(f"未找到图片: {args.imgdir}/{args.pattern}")
+    build_pdf(files, os.path.abspath(args.out))
 
 
 def main():
@@ -188,9 +228,15 @@ def main():
     pe.add_argument("--outdir", required=True)
     pe.add_argument("--interval", type=int, default=5, help="须与 prepare 一致")
     pe.add_argument("--zip", action="store_true", help="导出后打包 zip")
+    pe.add_argument("--pdf", default=None, help="同时拼接为 PDF 文件,值为其路径")
+
+    pf = sub.add_parser("pdf", help="把截图目录拼成 PDF(按文件名排序)")
+    pf.add_argument("imgdir")
+    pf.add_argument("--out", required=True, help="PDF 输出路径")
+    pf.add_argument("--pattern", default="slide_*.jpg", help="文件匹配模式,默认 slide_*.jpg")
 
     args = p.parse_args()
-    (run_prepare if args.cmd == "prepare" else run_export)(args)
+    {"prepare": run_prepare, "export": run_export, "pdf": run_pdf}[args.cmd](args)
 
 
 if __name__ == "__main__":

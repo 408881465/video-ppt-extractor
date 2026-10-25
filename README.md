@@ -35,10 +35,19 @@ python scripts/ppt_extract.py prepare 视频.mp4 --workdir WORKDIR \
 # 第 2 步：逐张查看 WORKDIR/sheets/ 图墙，判定每个候选编号
 #         保留 / 剔除(摄像头画面等) / 疑似动画中间态
 
-# 第 3 步：按编号导出全分辨率截图
+# 第 3 步：按编号导出全分辨率截图，可同时拼接 PDF / 打包 zip
 python scripts/ppt_extract.py export 视频.mp4 --workdir WORKDIR \
-    --keep "1-44" --drop "2" --outdir 输出目录 --zip
+    --keep "1-44" --drop "2" --outdir 输出目录 --pdf 成品.pdf --zip
+
+# 也可单独把任意截图目录拼成 PDF（按文件名排序 = 时间序）
+python scripts/ppt_extract.py pdf 截图目录 --out 成品.pdf
 ```
+
+## 跨平台
+
+Windows 与 macOS 均可使用。脚本为纯 Python（ffmpeg + opencv + Pillow），
+ffmpeg 安装路线见 SKILL.md「环境准备」（Windows: `winget install ffmpeg`；
+macOS: `brew install ffmpeg`）。zip 打包用 Python 标准库实现，无平台依赖。
 
 ## 关键参数
 
